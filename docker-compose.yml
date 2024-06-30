@@ -1,0 +1,50 @@
+services:
+  mysql-master:
+    image: 'mysql:latest'
+    container_name: 'mysql_order_master'
+    command: --server-id=1 --log-bin=mysql-bin --binlog-format=row
+    environment:
+      MYSQL_DATABASE: order_service_so16
+      MYSQL_USER: admin
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_PASSWORD: admin
+    volumes:
+      - so16_master_order_data:/var/lib/mysql
+    ports:
+      - '3307:3306'
+
+  mysql-slave:
+    image: 'mysql:latest'
+    container_name: 'mysql_order_slave'
+    depends_on:
+      - 'mysql-master'
+    command: --server-id=2 --log-bin=mysql-bin --binlog-format=row
+    environment:
+      MYSQL_DATABASE: order_service_so16
+      MYSQL_USER: admin
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_PASSWORD: admin
+    volumes:
+      - so16_slave_order_data:/var/lib/mysql
+    ports:
+      - '3308:3306'
+
+  mysql-customer-db:
+    image: mysql:latest
+    container_name: mysql_so16_customer_db
+    environment:
+      MYSQL_DATABASE: customer_service_so16
+      MYSQL_USER: admin
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_PASSWORD: admin
+    volumes:
+      - so16_customer_data:/var/lib/mysql
+    ports:
+      - '3309:3306'
+
+volumes:
+  so16_master_order_data:
+  so16_slave_order_data:
+  so16_customer_data:
+
+
