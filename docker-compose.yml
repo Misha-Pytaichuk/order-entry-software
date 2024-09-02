@@ -1,50 +1,86 @@
 services:
-  mysql-master:
+  mysql-so16-order-master:
     image: 'mysql:latest'
-    container_name: 'mysql_order_master'
+    container_name: 'mysql-so16-order-master'
     command: --server-id=1 --log-bin=mysql-bin --binlog-format=row
     environment:
-      MYSQL_DATABASE: order_service_so16
+      MYSQL_DATABASE: order_service_so16_db
       MYSQL_USER: admin
-      MYSQL_ROOT_PASSWORD: admin
       MYSQL_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: admin
     volumes:
-      - so16_master_order_data:/var/lib/mysql
+      - mysql-so16-order-master-data:/var/lib/mysql
     ports:
       - '3307:3306'
 
-  mysql-slave:
+  mysql-so16-order-slave:
     image: 'mysql:latest'
-    container_name: 'mysql_order_slave'
+    container_name: 'mysql-so16-order-slave'
     depends_on:
-      - 'mysql-master'
+      - 'mysql-so16-order-master'
     command: --server-id=2 --log-bin=mysql-bin --binlog-format=row
     environment:
-      MYSQL_DATABASE: order_service_so16
+      MYSQL_DATABASE: order_service_so16_db
       MYSQL_USER: admin
-      MYSQL_ROOT_PASSWORD: admin
       MYSQL_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: admin
     volumes:
-      - so16_slave_order_data:/var/lib/mysql
+      - mysql-so16-order-slave-data:/var/lib/mysql
     ports:
       - '3308:3306'
 
-  mysql-customer-db:
+  mysql-so16-customer-db:
     image: mysql:latest
-    container_name: mysql_so16_customer_db
+    container_name: 'mysql-so16-customer-db'
     environment:
-      MYSQL_DATABASE: customer_service_so16
+      MYSQL_DATABASE: customer_service_so16_db
       MYSQL_USER: admin
       MYSQL_ROOT_PASSWORD: admin
       MYSQL_PASSWORD: admin
     volumes:
-      - so16_customer_data:/var/lib/mysql
+      - mysql-so16-customer-data:/var/lib/mysql
     ports:
       - '3309:3306'
 
-volumes:
-  so16_master_order_data:
-  so16_slave_order_data:
-  so16_customer_data:
+  mysql-so16-keycloak-db:
+    image: mysql:latest
+    container_name: mysql-so16-keycloak-db
+    ports:
+      - "3310:3306"
+    environment:
+      - MYSQL_DATABASE=keycloak
+      - MYSQL_USER=keycloak
+      - MYSQL_PASSWORD=keycloak
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    healthcheck:
+      test: "mysqladmin ping -u root -p$${MYSQL_ROOT_PASSWORD}"
+    volumes:
+      - mysql-so16-keycloak-data:/var/lib/mysql
 
+  keycloak-so16:
+    image: quay.io/keycloak/keycloak:25.0.1
+    container_name: keycloak
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_DB=mysql
+      - KC_DB_PORT=3310
+      - KC_DB_URL_HOST=mysql-so16-keycloak-db
+      - KC_DB_URL_DATABASE=keycloak
+      - KC_DB_USERNAME=keycloak
+      - KC_DB_PASSWORD=keycloak
+      - KC_HEALTH_ENABLED=true
+    ports:
+      - "8180:8080"
+    command: start-dev
+    depends_on:
+      - mysql-so16-keycloak-db
+    healthcheck:
+      test: "curl -f http://localhost:8180/health/ready || exit 1"
+
+volumes:
+  mysql-so16-order-master-data:
+  mysql-so16-order-slave-data:
+  mysql-so16-customer-data:
+  mysql-so16-keycloak-data:
 

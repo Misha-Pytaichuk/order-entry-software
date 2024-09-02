@@ -4,7 +4,7 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3309/customer_service_so16
+    url: jdbc:mysql://localhost:3309/customer_service_so16_db
     username: admin
     password: admin
 
@@ -23,4 +23,4 @@ server:
 eureka:
   client:
     serviceUrl:
-      defaultZone: http://localhost:8167/eureka
+      defaultZone: http://eureka:password@localhost:8167/eureka
