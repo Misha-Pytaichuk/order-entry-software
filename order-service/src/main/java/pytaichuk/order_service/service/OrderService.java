@@ -144,9 +144,9 @@ public class OrderService {
     }
 
     public List<OrderResponse> getOrders(DateRequest dateRequest){
-        LocalDateTime createdAt = LocalDateTime.of(dateRequest.getYear(), dateRequest.getMonth(), dateRequest.getDay(), 0, 0, 0, 0);
-
-        List<Order> orderList = orderRepository.findOrdersByCreatedAt(createdAt);
+        LocalDateTime createdAtFrom = LocalDateTime.of(dateRequest.getYear(), dateRequest.getMonth(), dateRequest.getDay(), 0, 0, 0, 0);
+        LocalDateTime createdAtTo = createdAtFrom.plusDays(1);
+        List<Order> orderList = orderRepository.findOrdersByCreatedAtBetween(createdAtFrom, createdAtTo);
 
 
         return orderList.stream().map(this::mapToOrderResponse).toList();

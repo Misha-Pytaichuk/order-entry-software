@@ -1,18 +1,20 @@
 package pytaichuk.order_service.controller;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import jakarta.validation.Valid;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
-import pytaichuk.order_service.dto.customer.main_response.Response;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
 import pytaichuk.order_service.dto.item.OrderLineItemsRequestDto;
 import pytaichuk.order_service.dto.order.DateRequest;
 import pytaichuk.order_service.dto.order.OrderRequest;
 import pytaichuk.order_service.dto.order.OrderResponse;
-import pytaichuk.order_service.service.OrderService;
 import pytaichuk.order_service.exception.BindingExceptionHandler;
-import org.springframework.http.HttpStatus;
-import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.*;
+import pytaichuk.order_service.service.OrderService;
 
 import java.util.List;
 
@@ -22,6 +24,7 @@ import java.util.List;
 public class OrderController {
     private final OrderService orderService;
     private final BindingExceptionHandler bindingExceptionHandler;
+    private final String MESSAGE = "Service temporarily unavailable. Please try again later.";
 
     /* Get a list of orders by customer ID/ */
     @GetMapping("/{customerId}")
@@ -34,11 +37,11 @@ public class OrderController {
 
     /* Get all its details, including product and customer details, from the order number. */
     @GetMapping("/get/{orderNumber}")
-    @ResponseStatus(HttpStatus.OK)
-    public Response getOrder(@PathVariable("orderNumber") String orderNumber){
+    @CircuitBreaker(name = "customer", fallbackMethod = "fallbackMethod")
+    public ResponseEntity<Object> getOrder(@PathVariable("orderNumber") String orderNumber){
         if(orderNumber == null) throw new ValidationException("wrong path;");
 
-        return orderService.getOrder(orderNumber);
+        return ResponseEntity.status(HttpStatus.OK).body(orderService.getOrder(orderNumber));
     }
 
     /* Get a list of 30 orders on each page,
@@ -52,50 +55,47 @@ public class OrderController {
 
     /* Receive all orders placed on a specific date. */
     @GetMapping("/date")
-    @ResponseStatus(HttpStatus.OK)
-    public List<OrderResponse> getOrderByDate(@RequestBody DateRequest dateRequest){
-        return orderService.getOrders(dateRequest);
+    public ResponseEntity<List<OrderResponse>> getOrderByDate(@RequestBody DateRequest dateRequest){
+        return ResponseEntity.status(HttpStatus.OK).body(orderService.getOrders(dateRequest));
     }
 
     /* Adds a new order, to an existing customer. */
     @PostMapping()
-    @ResponseStatus(HttpStatus.CREATED)
-    public String createOrder(@RequestBody @Valid OrderRequest orderRequest, BindingResult bindingResult){
+    @Retry(name = "customerRetry")
+    @CircuitBreaker(name = "customer", fallbackMethod = "fallbackMethod")
+    public ResponseEntity<String> createOrder(@RequestBody @Valid OrderRequest orderRequest, BindingResult bindingResult){
 
         if(bindingResult.hasErrors()){
             throw new ValidationException(bindingExceptionHandler.ex(bindingResult));
         }
 
         orderService.save(orderRequest);
-        return "Order placed successfully!";
+        return ResponseEntity.status(HttpStatus.OK).body("Order placed successfully!");
     }
 
     /* Deletes an order and its item by order number. */
     @DeleteMapping("/{orderNumber}")
-    @ResponseStatus(HttpStatus.OK)
-    public String deleteOrder(@PathVariable("orderNumber") String orderNumber){
+    public ResponseEntity<String> deleteOrder(@PathVariable("orderNumber") String orderNumber){
         if(orderNumber == null) throw new ValidationException("wrong path;");
 
         orderService.deleteOrder(orderNumber);
 
-        return "Order deleted successfully!";
+        return ResponseEntity.status(HttpStatus.OK).body("Order deleted successfully!");
     }
 
     /* This endpoint is used when deleting a customer that deletes all of his orders. */
     @DeleteMapping("/byCustomer/{customerId}")
-    @ResponseStatus(HttpStatus.OK)
-    public String deleteOrder(@PathVariable("customerId") Long customerId){
+    public ResponseEntity<String> deleteOrder(@PathVariable("customerId") Long customerId){
         if(customerId == null) throw new ValidationException("wrong path;");
 
         orderService.deleteOrderByCustomer(customerId);
 
-        return "Order deleted successfully!";
+        return ResponseEntity.status(HttpStatus.OK).body("Order deleted successfully!");
     }
 
     /* This endpoint is used to update the data of a specific item in the order. */
     @PatchMapping("/{orderNumber}/{itemId}")
-    @ResponseStatus(HttpStatus.OK)
-    public String updateOrderItem(@PathVariable("orderNumber") String orderNumber,
+    public ResponseEntity<String> updateOrderItem(@PathVariable("orderNumber") String orderNumber,
                                   @PathVariable("itemId") Long itemId,
                                   @RequestBody @Valid OrderLineItemsRequestDto orderLineItemsRequestDto,
                                   BindingResult bindingResult){
@@ -107,15 +107,14 @@ public class OrderController {
 
         orderService.updateItem(orderNumber, itemId, orderLineItemsRequestDto);
 
-        return "Order item updated successfully!";
+        return ResponseEntity.status(HttpStatus.OK).body("Order updated successfully!");
     }
 
     /* This endpoint is used to add items to an existing order. */
-    @PatchMapping("/{orderNumber}")
-    @ResponseStatus(HttpStatus.OK)
-    public String addItemToOrder(@PathVariable("orderNumber") String orderNumber,
-                                 @RequestBody @Valid OrderLineItemsRequestDto orderLineItemsRequestDto,
-                                 BindingResult bindingResult){
+    @PutMapping("/{orderNumber}")
+    public ResponseEntity<String> addItemToOrder(@PathVariable("orderNumber") String orderNumber,
+                                                 @RequestBody @Valid OrderLineItemsRequestDto orderLineItemsRequestDto,
+                                                 BindingResult bindingResult){
         if(orderNumber == null ) throw new ValidationException("wrong path;");
 
         if(bindingResult.hasErrors()){
@@ -124,18 +123,25 @@ public class OrderController {
 
         orderService.addItemToOrder(orderNumber, orderLineItemsRequestDto);
 
-        return "Order item created successfully!";
+        return ResponseEntity.status(HttpStatus.OK).body("Item added successfully!");
     }
 
     /* This endpoint is used to delete products from an existing order.
     If you delete all products, the order will be deleted automatically. */
     @DeleteMapping("/{orderNumber}/{itemId}")
-    @ResponseStatus(HttpStatus.OK)
-    public String deleteItemFromOrder(@PathVariable("orderNumber") String orderNumber,
-                                      @PathVariable("itemId") Long itemId){
+    public ResponseEntity<String> deleteItemFromOrder(@PathVariable("orderNumber") String orderNumber,
+                                                      @PathVariable("itemId") Long itemId){
         if(orderNumber == null || itemId == null) throw new ValidationException("wrong path;");
         orderService.deleteItemFromOrder(orderNumber, itemId);
 
-        return "Item deleted successfully!";
+        return ResponseEntity.status(HttpStatus.OK).body("Item deleted successfully!");
+    }
+
+    public ResponseEntity<String> fallbackMethod(OrderRequest orderRequest, BindingResult bindingResult, Throwable exception){
+        return new ResponseEntity<>(MESSAGE + "\n" + exception.toString(), HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    public ResponseEntity<String> fallbackMethod(String orderNumber, Throwable exception){
+        return new ResponseEntity<>(MESSAGE + "\n" + exception.toString(), HttpStatus.SERVICE_UNAVAILABLE);
     }
 }

@@ -24,3 +24,43 @@ eureka:
   client:
     serviceUrl:
       defaultZone: http://eureka:password@localhost:8167/eureka
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  health:
+    ratelimiters:
+      enabled: false
+    circuitbreakers:
+      enabled: true
+
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      customer:
+        register-health-indicator: true
+        event-consumer-buffer-size: 10
+        sliding-window-type: count_based
+        sliding-window-size: 10
+        failure-rate-threshold: 10
+        wait-duration-in-open-state:
+          seconds: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - pytaichuk.order_service.exception.FindException
+          - jakarta.validation.ValidationException
+  retry:
+    instances:
+      customerRetry:
+        max-attempts: 1
+        wait-duration:
+          seconds: 1
+
+
