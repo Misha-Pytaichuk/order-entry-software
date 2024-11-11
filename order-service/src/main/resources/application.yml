@@ -39,13 +39,12 @@ management:
     circuitbreakers:
       enabled: true
 
-
 resilience4j:
   circuitbreaker:
     instances:
       customer:
         register-health-indicator: true
-        event-consumer-buffer-size: 10
+        event-consumer-buffer-size: 3
         sliding-window-type: count_based
         sliding-window-size: 10
         failure-rate-threshold: 10
@@ -53,14 +52,20 @@ resilience4j:
           seconds: 5
         permitted-number-of-calls-in-half-open-state: 3
         automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException
+          - io.netty.handler.timeout.TimeoutException
         ignore-exceptions:
           - pytaichuk.order_service.exception.FindException
           - jakarta.validation.ValidationException
   retry:
     instances:
       customerRetry:
-        max-attempts: 1
+        max-attempts: 2
         wait-duration:
           seconds: 1
+        ignore-exceptions:
+          - jakarta.validation.ValidationException
+          - pytaichuk.order_service.exception.FindException
 
 

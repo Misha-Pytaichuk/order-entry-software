@@ -1,6 +1,8 @@
 package pytaichuk.order_service.controller;
 
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import jakarta.validation.ValidationException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import pytaichuk.order_service.exception.FindException;
 import pytaichuk.order_service.exception.ResponseException;
 import org.springframework.http.HttpStatus;
@@ -30,5 +32,24 @@ public class ExceptionHandlerController {
         );
 
         return new ResponseEntity<>(responseException, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler({WebClientResponseException.class, CallNotPermittedException.class})
+    private ResponseEntity<ResponseException> personExceptionHandler(Exception exception){
+
+        String message = null;
+
+        if(exception instanceof WebClientResponseException){
+            message = "Something wrong, try again...";
+        } else if(exception instanceof CallNotPermittedException){
+            message = "Service is currently not available due to circuit breaker policy.";
+        }
+
+        ResponseException responseException = new ResponseException(
+                message,
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(responseException, HttpStatus.SERVICE_UNAVAILABLE);
     }
 }

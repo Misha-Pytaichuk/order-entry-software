@@ -1,7 +1,5 @@
 package pytaichuk.order_service.controller;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import jakarta.validation.Valid;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +22,6 @@ import java.util.List;
 public class OrderController {
     private final OrderService orderService;
     private final BindingExceptionHandler bindingExceptionHandler;
-    private final String MESSAGE = "Service temporarily unavailable. Please try again later.";
 
     /* Get a list of orders by customer ID/ */
     @GetMapping("/{customerId}")
@@ -37,19 +34,16 @@ public class OrderController {
 
     /* Get all its details, including product and customer details, from the order number. */
     @GetMapping("/get/{orderNumber}")
-    @CircuitBreaker(name = "customer", fallbackMethod = "fallbackMethod")
     public ResponseEntity<Object> getOrder(@PathVariable("orderNumber") String orderNumber){
         if(orderNumber == null) throw new ValidationException("wrong path;");
-
         return ResponseEntity.status(HttpStatus.OK).body(orderService.getOrder(orderNumber));
     }
 
     /* Get a list of 30 orders on each page,
     sorted by order registration date in descending or ascending order. */
-    @GetMapping("/{page}/{sort}") //"ASC"/ "DESC"
+    @GetMapping("/{page}/{sort}") //"asc"/ "desc"
     @ResponseStatus(HttpStatus.OK)
     public List<OrderResponse> getOrders(@PathVariable("page") Integer page, @PathVariable("sort") String sort){
-        if(page == null || sort == null) throw new ValidationException("wrong path;");
         return orderService.getOrders(page, sort);
     }
 
@@ -61,8 +55,6 @@ public class OrderController {
 
     /* Adds a new order, to an existing customer. */
     @PostMapping()
-    @Retry(name = "customerRetry")
-    @CircuitBreaker(name = "customer", fallbackMethod = "fallbackMethod")
     public ResponseEntity<String> createOrder(@RequestBody @Valid OrderRequest orderRequest, BindingResult bindingResult){
 
         if(bindingResult.hasErrors()){
@@ -135,13 +127,5 @@ public class OrderController {
         orderService.deleteItemFromOrder(orderNumber, itemId);
 
         return ResponseEntity.status(HttpStatus.OK).body("Item deleted successfully!");
-    }
-
-    public ResponseEntity<String> fallbackMethod(OrderRequest orderRequest, BindingResult bindingResult, Throwable exception){
-        return new ResponseEntity<>(MESSAGE + "\n" + exception.toString(), HttpStatus.SERVICE_UNAVAILABLE);
-    }
-
-    public ResponseEntity<String> fallbackMethod(String orderNumber, Throwable exception){
-        return new ResponseEntity<>(MESSAGE + "\n" + exception.toString(), HttpStatus.SERVICE_UNAVAILABLE);
     }
 }

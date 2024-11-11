@@ -1,6 +1,14 @@
 package pytaichuk.order_service.service;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 import pytaichuk.order_service.dto.customer.CustomerResponse;
 import pytaichuk.order_service.dto.customer.main_response.Response;
 import pytaichuk.order_service.dto.item.OrderLineItemsRequestDto;
@@ -8,16 +16,11 @@ import pytaichuk.order_service.dto.item.OrderLineItemsResponseDto;
 import pytaichuk.order_service.dto.order.DateRequest;
 import pytaichuk.order_service.dto.order.OrderRequest;
 import pytaichuk.order_service.dto.order.OrderResponse;
+import pytaichuk.order_service.exception.FindException;
 import pytaichuk.order_service.model.Order;
 import pytaichuk.order_service.model.OrderLineItems;
 import pytaichuk.order_service.repository.OrderLineItemsRepository;
 import pytaichuk.order_service.repository.OrderRepository;
-import pytaichuk.order_service.exception.FindException;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,6 +35,8 @@ public class OrderService {
     private final OrderLineItemsRepository orderLineItemsRepository;
     private final WebClient.Builder webClientBuilder;
 
+    @Retry(name = "customerRetry")
+    @CircuitBreaker(name = "customer")
     public Response getOrder(String orderNumber){
         Order order = findOrder(orderNumber);
 
@@ -43,20 +48,23 @@ public class OrderService {
                 .bodyToMono(CustomerResponse.class)
                 .block();
 
+
         OrderResponse orderResponse = mapToOrderResponse(findOrder(orderNumber));
         return buildResponse(Objects.requireNonNull(customerResponse), orderResponse);
     }
 
+    @Retry(name = "customerRetry")
+    @CircuitBreaker(name = "customer")
     @Transactional
     public void save(OrderRequest orderRequest) {
 
         Boolean isPresent = webClientBuilder.build().get()
-                .uri("http://customer-service", uriBuilder -> uriBuilder
-                        .path("/api/v1/customer/isPresent/{customerId}")
-                        .build(orderRequest.getCustomerId()))
-                .retrieve()
-                .bodyToMono(Boolean.class)
-                .block();
+            .uri("http://customer-service", uriBuilder -> uriBuilder
+                    .path("/api/v1/customer/isPresent/{customerId}")
+                    .build(orderRequest.getCustomerId()))
+            .retrieve()
+            .bodyToMono(Boolean.class)
+            .block();
 
         if(Boolean.FALSE.equals(isPresent)) throw new FindException("id - Користувача з таким id не інсує");
 
@@ -135,10 +143,13 @@ public class OrderService {
     public List<OrderResponse> getOrders(Integer page, String sort){
         List<Order> orderList;
 
-        if(sort.equals("ASC"))
+        if(sort.equals("asc"))
             orderList = orderRepository.findAll(PageRequest.of(page, 30, Sort.by("createdAt").ascending())).getContent();
-        else
+        else if(sort.equals("desc"))
             orderList = orderRepository.findAll(PageRequest.of(page, 30, Sort.by("createdAt").descending())).getContent();
+        else {
+            throw new ValidationException("wrong path;");
+        }
 
         return orderList.stream().map(this::mapToOrderResponse).toList();
     }
