@@ -16,6 +16,6 @@ public class CustomerRequest {
     private String name;
     @NotBlank(message = "Поле не може бути пустим")
     private String surname;
-    @Pattern(regexp = "0\\d{9}", message = "Не вірний формат номеру телефону")
+    @Pattern(regexp = "0\\d{9}", message = "Невірний формат номеру телефону")
     private String telephoneNumber;
 }

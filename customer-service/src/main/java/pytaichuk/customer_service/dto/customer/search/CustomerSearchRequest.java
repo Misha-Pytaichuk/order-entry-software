@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CustomerSearchRequest {
-    @Pattern(regexp = "0\\d{9}", message = "Не вірний формат номеру телефону")
+    @Pattern(regexp = "0\\d{9}", message = "Невірний формат номеру телефону")
     private String telephoneNumber;
 }

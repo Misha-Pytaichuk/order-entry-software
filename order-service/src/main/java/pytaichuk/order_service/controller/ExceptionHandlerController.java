@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeoutException;
 
 @ControllerAdvice
 public class ExceptionHandlerController {
@@ -43,6 +44,8 @@ public class ExceptionHandlerController {
             message = "Something wrong, try again...";
         } else if(exception instanceof CallNotPermittedException){
             message = "Service is currently not available due to circuit breaker policy.";
+        } else if(exception instanceof TimeoutException){
+            message = "Timeout... Retry..";
         }
 
         ResponseException responseException = new ResponseException(
